@@ -24,13 +24,13 @@ SUCCESS_PATTERN_FILE = TEMPLATES_DIR_IN_USER / "success_pattern.template"
 FAILED_PATTERN_FILE = TEMPLATES_DIR_IN_USER / "failed_pattern.template"
 EXCEPTION_PATTERN_FILE = TEMPLATES_DIR_IN_USER / "exception_pattern.template"
 LOG_READ_BUFFER_SIZE = 8192 # Read last 8KB of log files
+SAVE_INTERVAL = 100 # Save the Excel file every 100 records
 
 # --- 辅助与配置函数 ---
 def get_templates_dir_in_pkg():
     return Path(__file__).parent / "templates"
 
 def ensure_config_files_exist():
-    """Ensures all config and template files exist in the user's home directory."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     TEMPLATES_DIR_IN_USER.mkdir(exist_ok=True)
     
@@ -64,7 +64,7 @@ def load_templates():
 
 # ... (The rest of the main.py file remains largely the same)
 STATIC_HEADERS_PRE = ["Root Dir"]
-STATIC_HEADERS_POST = ["Log File Name", "Absolute Path", "Analysis Result", "Analysis Details"]
+STATIC_HEADERS_POST = ["Log File Name", "Absolute Path", "Analysis Result", "Analysis Details", "Extracted Log Content"]
 DEBUG_HEADERS = ["Final Prompt to LLM", "LLM Reasoning & Response"]
 STATUS_PENDING = "Pending"; STATUS_SUCCESS = "成功"; STATUS_FAILURE = "失败"
 CSV_ENCODING = 'utf-8-sig'
@@ -146,7 +146,7 @@ def _initialize_csv(path, headers, logs, max_depth, base):
         writer.writerow(headers)
         for log in logs:
             dir_parts, file_name = get_dir_parts(log, base, max_depth)
-            row = dir_parts + [file_name, log, STATUS_PENDING, ""]
+            row = dir_parts + [file_name, log, STATUS_PENDING, "", ""]
             if "Final Prompt to LLM" in headers:
                 row.extend(["", ""])
             writer.writerow(row)
@@ -166,10 +166,11 @@ def _get_tasks_from_csv(path):
 
 def _update_csv_row(path, index, data, headers):
     rows = list(csv.reader(open(path, 'r', encoding=CSV_ENCODING)))
-    res, reason, req, resp = data
+    res, reason, log_content, req, resp = data
     res_idx = headers.index("Analysis Result")
     det_idx = headers.index("Analysis Details")
-    rows[index-1][res_idx], rows[index-1][det_idx] = res, reason
+    log_idx = headers.index("Extracted Log Content")
+    rows[index-1][res_idx], rows[index-1][det_idx], rows[index-1][log_idx] = res, reason, log_content
     if "Final Prompt to LLM" in headers:
         req_idx = headers.index("Final Prompt to LLM")
         resp_idx = headers.index("LLM Reasoning & Response")
@@ -184,7 +185,7 @@ def _initialize_xlsx(path, headers, logs, max_depth, base):
     for cell in ws[1]: cell.font = FONT_BOLD
     for log in logs:
         dir_parts, file_name = get_dir_parts(log, base, max_depth)
-        row = dir_parts + [file_name, log, STATUS_PENDING, ""]
+        row = dir_parts + [file_name, log, STATUS_PENDING, "", ""]
         if "Final Prompt to LLM" in headers:
             row.extend(["", ""])
         ws.append(row)
@@ -203,11 +204,13 @@ def _get_tasks_from_xlsx(path):
     return tasks, wb, headers
 
 def _update_xlsx_row(ws, index, data, headers):
-    res, reason, req, resp = data
+    res, reason, log_content, req, resp = data
     res_idx = headers.index("Analysis Result") + 1
     det_idx = headers.index("Analysis Details") + 1
+    log_idx = headers.index("Extracted Log Content") + 1
     ws.cell(row=index, column=res_idx, value=res)
     ws.cell(row=index, column=det_idx, value=reason)
+    ws.cell(row=index, column=log_idx, value=log_content)
     cell_to_format = ws.cell(row=index, column=res_idx)
     if res == STATUS_SUCCESS: cell_to_format.fill = FILL_SUCCESS
     elif res == STATUS_FAILURE: cell_to_format.fill = FILL_FAILURE
@@ -237,11 +240,10 @@ def analyze_log(log_path, config, templates):
             f.seek(-LOG_READ_BUFFER_SIZE, os.SEEK_END)
             log_content = f.read().decode('utf-8', errors='ignore')
     except (IOError, OSError):
-        # Handle files smaller than the buffer size
         with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
             log_content = f.read()
     except Exception as e:
-        return "文件读取错误", f"无法读取: {e}", "", ""
+        return "文件读取错误", f"无法读取: {e}", "", "", ""
 
     prompt = prompt_template.format(
         log_content=log_content,
@@ -277,10 +279,10 @@ def analyze_log(log_path, config, templates):
             elif "用例分析内容：" in line: reason = line.split("用例分析内容：")[1].strip()
         
         debug_response = f"--- Reasoning ---\n{reasoning_content}\n\n--- Final Answer ---\n{final_content}"
-        return result, reason, prompt, debug_response
+        return result, reason, log_content, prompt, debug_response
 
     except Exception as e:
-        return "API或解析错误", str(e), prompt, buffer
+        return "API或解析错误", str(e), log_content, prompt, buffer
 
 def handle_run(args):
     ensure_config_files_exist()
@@ -319,6 +321,7 @@ def handle_run(args):
     print(f"开始使用 {args.threads} 个线程并发分析 {len(tasks)} 个文件...")
     
     file_lock = threading.Lock()
+    completed_count = 0
     
     with ThreadPoolExecutor(max_workers=args.threads) as executor:
         future_to_task = {
@@ -332,9 +335,14 @@ def handle_run(args):
                 try:
                     result_data = future.result()
                     update_report_row(report_path, row_index, result_data, headers, file_lock, wb)
+                    completed_count += 1
+                    if completed_count % SAVE_INTERVAL == 0:
+                        if wb: # Only save if it's an Excel file
+                            with file_lock:
+                                wb.save(report_path)
                 except Exception as exc:
                     print(f"任务 {file_path} 生成了一个异常: {exc}")
-                    error_data = ("线程异常", str(exc), "", "")
+                    error_data = ("线程异常", str(exc), "", "", "")
                     update_report_row(report_path, row_index, error_data, headers, file_lock, wb)
         finally:
             print("正在完成报告...")
