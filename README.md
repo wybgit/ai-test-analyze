@@ -1,92 +1,81 @@
 # AI-Test-Analyze: AI 驱动的日志分析工具
 
-`ai-test-analyze` 是一个命令行的效率工具，它利用大语言模型（LLM）的强大能力，通过多线程并发，快速分析指定的测试日志文件，并生成一个结构化、可选格式的分析报告。
+`ai-test-analyze` 是一个专业的命令行工具，它利用大语言模型（LLM）的强大能力，通过多线程并发，快速分析指定的测试日志文件，并生成一个结构化、可配置、可选格式的动态分析报告。
 
 ## 核心功能
 
-- **多线程并发分析**：通过 `--threads` 参数指定线程数（默认为8），大幅缩短分析大量日志文件所需的时间。
-- **智能判断**：根据自定义的 Prompt，智能判断用例的成功或失败。
-- **双格式报告**：
-    - **CSV 或 Excel**：通过 `--format` 参数自由选择输出 `.csv` 或 `.xlsx` 格式。
-    - **精美排版 (Excel)**：选择 `xlsx` 格式时，报告将自动应用颜色标记、自动列宽、文本换行和固定表头，极大提升可读性。
-- **实时进度**：使用总进度条实时显示并发分析的完成进度。
-- **断点续传**：支持从上次中断的报告（CSV 或 Excel）继续分析，无需重复工作。
-- **增强的调试模式**：提供 `--debug` 选项，可在报告中额外记录**最终发送给 LLM 的 Prompt** 和 **LLM 返回的、包含思考过程和最终答���的完整响应**。
-- **高度可配置**：通过 `config.json` 和 `prompt.template` 文件，轻松定制工具的行为。
+- **开箱即用**: 项目内置 `example` 目录，包含丰富的示例日志，让您无需任何准备即可体验工具的完整功能。
+- **子命令结构**:
+    - `run`: 执行核心的分析任务。
+    - `config`: 快速显示所有配置和模板文件的路径。
+- **强大的过滤功能**:
+    - 通过 `config.json` 文件，同时支持**白名单**和**黑名单**规则。
+- **高级 Prompt 模板**:
+    - 所有模板都存放在 `~/.config/ai-test-analyze/templates/` 目录下，方便集中管理。
+    - 主 `prompt.template` 可以动态地从 `success_pattern.template` 和 `failed_pattern.template` 文件中加载成功/失败的关键模式。
+- **多线程并发分析**: 通过 `--threads` 参数指定线程数（默认为8），大幅缩短分析时间。
+- **动态目录报告**: 报告能自动适应任意深度的目录结构，动态生成 `Sub Dir 1`, `Sub Dir 2`... 等列。
+- **自动初始化**: 首次运行时，所有必需的配置文件和模板都会自动在您的用户主目录中创建。
 
 ## 安装
 
-在项目根目录下，运行以下命令进行安装或更新。该命令会自动处理所有依赖库。
+在项目根目录下，运行以下命令进行安装或更新。
 
 ```bash
 pip install .
 ```
 
-## 打包与分发
-
-项目包含一个一键式打包脚本，用于生成可分发的 `.whl` 文件。
-
-1.  **确保脚本可执行** (只需首次执行):
-    ```bash
-    chmod +x build.sh
-    ```
-
-2.  **运行打包脚本**:
-    ```bash
-    ./build.sh
-    ```
-
-脚本会自动清理旧的构建产物，并生成一个新的 wheel 文件到 `dist/` 目录下。你可以将这个 `.whl` 文件分发给他人，他们可以通过以下命令进行安装：
-
-```bash
-pip install /path/to/the/generated-wheel-file.whl
-```
-
 ## 快速开始
 
-### 1. 首次运行与配置
+本项目自带一个 `example` 目录，其中包含了不同类型的日志文件。我们将使用这个目录来演示如何使用本工具。
 
-首次运行 `ai-test-analyze` 时，程序会自动在 `~/.config/ai-test-analyze/config.json` 创建配置文件。请根据提示，打开该文件并填入您的 `api_token`。
+### 1. 查看配置
 
-### 2. 执行分析
-
-将工具指向包含日志文件的根目录。
-
-**使用默认的8个线程进行分析：**
-```bash
-ai-test-analyze /path/to/your/logs
-```
-
-**指定16个线程，并输出为 Excel 报告：**
-```bash
-ai-test-analyze /path/to/your/logs --threads 16 --format xlsx
-```
-
-### 3. 中断与恢复
-
-如果分析中断，使用 `--resume` 参数指向之前生成的报告文件即可。程序将使用与新命令中指定的相同线程数继续执行剩余任务。
+安装后，首先运行 `config` 命令查看所有配置文件的位置。程序在首次运行时会自动创建这些文件。
 
 ```bash
-ai-test-analyze --resume ./analysis_report_20250701_103000.xlsx --threads 16
+ai-test-analyze config
+```
+输出:
+```
+配置文件目录: /home/user/.config/ai-test-analyze
+主配置文件: /home/user/.config/ai-test-analyze/config.json
+模板文件目录: /home/user/.config/ai-test-analyze/templates
 ```
 
-### 4. 调试模式
+### 2. 填入 API Token
 
-如果需要深入分析 LLM 的行为，请使用 `--debug` 标志。
+根据上一步显示的路径，打开 `config.json` 文件，**��填入您的 `api_token`**。对于本示例，其他配置（如黑白名单）可暂时保持默认。
+
+### 3. 执行分析
+
+现在，让我们用 `run` 命令来分析 `example` 目录，并生成一个 Excel 报告。
 
 ```bash
-ai-test-analyze /path/to/your/logs --debug --threads 4
+ai-test-analyze run ./example --format xlsx --output example_report
 ```
 
-## 命令行选项
+程序会：
+1.  显示一个进度条，扫描 `example` 目录下的所有文件。
+2.  显示第二个进度条，使用8个线程并发分析找到的日志。
+3.  在当前目录下生成一个名为 `example_report.xlsx` 的精美报告。
 
-- `path`: 要分析的日志文件或目录的路径。**（与 `--resume` 冲突）**
+您可以打开这个 Excel 文件，查看工具对 `example` 目录中每个日志的分析结果。
+
+### 4. (可选) 自定义模板
+
+如果您想调整分析逻辑，可以编辑 `~/.config/ai-test-analyze/templates/` 目录下的模板文件。例如，您可以向 `failed_pattern.template` 中添加更多您自己的失败关键词。
+
+## 命令行
+
+### `ai-test-analyze run [OPTIONS]`
+执行分析任务。
+- `path`: 要分析的日志文件或目录的路径。
+- `--output`: *可选*。指定输出报告的路径和名称（无需后缀）。
 - `--threads`: *可选*。并发分析的线程数。默认为 `8`。
 - `--format`: *可选*。输出报告的格式，可选值为 `csv` 或 `xlsx`。默认为 `csv`。
-- `--resume`: *可选*。指定一个报告文件（.csv 或 .xlsx）以恢复分析。
-- `--output`: *可选*。为新任务指定输出报告的路径。
-- `--config`: *可选*。指定一个自定义的配置文件路径。
-- `--debug`: *可选*。激活调试模式，在报告中记录最终的Prompt和包含思考过程的LLM响应。
+- `--resume`: *可选*。指定一个报告文件以恢复分析。
+- `--debug`: *可选*。激活调试模式。
 
----
-由 Gemini 强力驱动
+### `ai-test-analyze config`
+显示所有配置和模板文件的路径。

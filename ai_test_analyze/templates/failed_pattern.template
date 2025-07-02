@@ -1,0 +1,14 @@
+# 关键词模式 (如果日志包含以下任何一行，将被视为失败)
+- "Error"
+- "Failed"
+- "Traceback"
+- "Exception"
+- "Exit code: 1"
+- "Segmentation fault"
+- "core dumped"
+- "fatal error"
+
+# 常见错误分析 (你可以指导LLM如何分析特定错误)
+- **KeyError**: 如果看到 `KeyError`，请指出是由于代码尝试访问一个不存在的字典键。
+- **FileNotFoundError**: 如果看到 `FileNotFoundError`，请指出是由于程序试图打开一个不存在的文件。
+- **AssertionError**: 如果看到 `AssertionError`，请说明这是一个测试断言失败，意味着程序的某个实际结果与预期不符。

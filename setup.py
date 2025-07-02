@@ -9,6 +9,9 @@ setup(
         "tqdm",
         "openpyxl",
     ],
+    package_data={
+        'ai_test_analyze': ['templates/*'],
+    },
     entry_points={
         "console_scripts": [
             "ai-test-analyze=ai_test_analyze.main:main",
