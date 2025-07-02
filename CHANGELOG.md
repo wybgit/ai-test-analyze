@@ -5,17 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-07-02
+
+### Added
+- **Intelligent Log Reading**: The tool now analyzes only the last 8KB of each log file, focusing on the most relevant information where errors typically occur.
+- **Exception Pattern Matching**: Introduced a new `exception_pattern.template` to define benign error messages that should not be treated as failures, making the analysis more nuanced.
+
+### Changed
+- The main prompt template (`prompt.template`) has been updated to include the new exception pattern logic.
+- The initialization process now also creates the `exception_pattern.template` in the user's configuration directory.
+
 ## [0.3.0] - 2025-07-02
 
 ### Added
-- **Template Directory**: All user-configurable templates (`prompt`, `success_pattern`, `failed_pattern`) are now stored in a dedicated `templates` subdirectory within the user's config folder (`~/.config/ai-test-analyze/templates`).
-- **Rich Failure Patterns**: The `failed_pattern.template` now supports more detailed error analysis guidance in addition to simple keywords.
-- **Example Directory**: Included a comprehensive `example` directory with sample logs for out-of-the-box testing and demonstration.
+- A dedicated `templates` directory for all user-configurable templates.
+- An `example` directory with sample logs for out-of-the-box testing.
+- Richer content for the `failed_pattern.template`.
 
 ### Changed
-- **File Structure**: Reorganized the package to include a `templates` directory, which is now correctly included in the distribution thanks to `package_data` in `setup.py`.
-- **Initialization Logic**: The tool now copies the default templates from the package to the user's configuration directory on first run, ensuring they are available for user modification.
-- **Documentation**: The `README.md` has been significantly updated to use the new `example` directory for its primary usage tutorial, making it much easier for new users to get started.
+- Reorganized the package to correctly include the `templates` directory in the distribution.
+- Updated the `README.md` with a comprehensive tutorial using the `example` directory.
 
 ## [0.2.0] - 2025-07-02
 
@@ -23,7 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sub-command Interface (`run`, `config`).
 - `config` command to display paths to all configuration files.
 - Blacklist filtering for directories and files.
-- Enhanced prompt templating with dynamic success/failure patterns.
 
 ### Changed
 - Simplified Excel view by removing outline grouping.

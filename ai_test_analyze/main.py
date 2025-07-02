@@ -22,10 +22,11 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 PROMPT_TEMPLATE_FILE = TEMPLATES_DIR_IN_USER / "prompt.template"
 SUCCESS_PATTERN_FILE = TEMPLATES_DIR_IN_USER / "success_pattern.template"
 FAILED_PATTERN_FILE = TEMPLATES_DIR_IN_USER / "failed_pattern.template"
+EXCEPTION_PATTERN_FILE = TEMPLATES_DIR_IN_USER / "exception_pattern.template"
+LOG_READ_BUFFER_SIZE = 8192 # Read last 8KB of log files
 
 # --- 辅助与配置函数 ---
 def get_templates_dir_in_pkg():
-    # Find the templates directory within the installed package
     return Path(__file__).parent / "templates"
 
 def ensure_config_files_exist():
@@ -35,9 +36,7 @@ def ensure_config_files_exist():
     
     pkg_templates_dir = get_templates_dir_in_pkg()
 
-    # Check and copy config.json
     if not CONFIG_FILE.exists():
-        # We create a default one here, assuming no template for it in the package
         default_config = {
             "api_token": "your-api-key-here", "api_url": "https://api.siliconflow.cn/v1/chat/completions",
             "model": "Qwen/Qwen3-235B-A22B", "max_tokens": 8192, "temperature": 0.6, "top_p": 0.7,
@@ -48,8 +47,8 @@ def ensure_config_files_exist():
             json.dump(default_config, f, indent=4, ensure_ascii=False)
         print(f"默认配置文件已创建于: {CONFIG_FILE}")
 
-    # Check and copy template files
-    for template_file in ["prompt.template", "success_pattern.template", "failed_pattern.template"]:
+    template_files = ["prompt.template", "success_pattern.template", "failed_pattern.template", "exception_pattern.template"]
+    for template_file in template_files:
         user_path = TEMPLATES_DIR_IN_USER / template_file
         pkg_path = pkg_templates_dir / template_file
         if not user_path.exists() and pkg_path.exists():
@@ -60,9 +59,10 @@ def load_templates():
     with open(PROMPT_TEMPLATE_FILE, 'r', encoding='utf-8') as f: prompt_template = f.read()
     with open(SUCCESS_PATTERN_FILE, 'r', encoding='utf-8') as f: success_patterns = f.read()
     with open(FAILED_PATTERN_FILE, 'r', encoding='utf-8') as f: failed_patterns = f.read()
-    return prompt_template, success_patterns, failed_patterns
+    with open(EXCEPTION_PATTERN_FILE, 'r', encoding='utf-8') as f: exception_patterns = f.read()
+    return prompt_template, success_patterns, failed_patterns, exception_patterns
 
-# ... (The rest of the main.py file remains largely the same, only the entry points need to call ensure_config_files_exist)
+# ... (The rest of the main.py file remains largely the same)
 STATIC_HEADERS_PRE = ["Root Dir"]
 STATIC_HEADERS_POST = ["Log File Name", "Absolute Path", "Analysis Result", "Analysis Details"]
 DEBUG_HEADERS = ["Final Prompt to LLM", "LLM Reasoning & Response"]
@@ -231,17 +231,23 @@ def _finalize_xlsx(wb, headers, path):
     wb.save(path)
 
 def analyze_log(log_path, config, templates):
-    prompt_template, success_patterns, failed_patterns = templates
+    prompt_template, success_patterns, failed_patterns, exception_patterns = templates
     try:
+        with open(log_path, 'rb') as f:
+            f.seek(-LOG_READ_BUFFER_SIZE, os.SEEK_END)
+            log_content = f.read().decode('utf-8', errors='ignore')
+    except (IOError, OSError):
+        # Handle files smaller than the buffer size
         with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
-            log_content = f.read(4000)
+            log_content = f.read()
     except Exception as e:
         return "文件读取错误", f"无法读取: {e}", "", ""
 
     prompt = prompt_template.format(
         log_content=log_content,
         success_patterns=success_patterns,
-        failed_patterns=failed_patterns
+        failed_patterns=failed_patterns,
+        exception_patterns=exception_patterns
     )
     headers = {"Authorization": f"Bearer {config['api_token']}", "Content-Type": "application/json"}
     payload = {"model": config.get("model"), "messages": [{"role": "user", "content": prompt}], "max_tokens": config.get("max_tokens"), "stream": True}

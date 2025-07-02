@@ -1,0 +1,6 @@
+# 例外模式 (如果日志中包含这些模式，即使也包含失败模式，也可能不被视为失败)
+# 这对于处理已知的、良性的警告或特定的、可接受的错误非常有用。
+
+- "DeprecationWarning:"
+- "Connection reset by peer"
+- "Ignoring test due to unmet dependency"
