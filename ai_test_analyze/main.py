@@ -14,6 +14,7 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
+import re
 
 # --- 全局常量 ---
 CONFIG_DIR = Path.home() / ".config" / "ai-test-analyze"
@@ -40,6 +41,8 @@ def ensure_config_files_exist():
         default_config = {
             "api_token": "your-api-key-here", "api_url": "https://api.siliconflow.cn/v1/chat/completions",
             "model": "Qwen/Qwen3-235B-A22B", "max_tokens": 8192, "temperature": 0.6, "top_p": 0.7,
+            "fast_success_regex": ["All tests passed successfully", "^\\s*OK\\s*$", "BUILD SUCCESSFUL"],
+            "fast_failure_regex": ["(?i)ERROR", "(?i)FATAL", "Traceback \\(most recent call last\\):", "BUILD FAILED"],
             "directory_whitelist": ["*"], "logfile_whitelist": ["*.log", "*.txt"],
             "directory_blacklist": [".git", "__pycache__"], "logfile_blacklist": []
         }
@@ -245,6 +248,20 @@ def analyze_log(log_path, config, templates):
     except Exception as e:
         return "文件读取错误", f"无法读取: {e}", "", "", ""
 
+    # --- Fast Path Regex Check ---
+    success_regex_list = config.get("fast_success_regex", [])
+    if success_regex_list:
+        for pattern in success_regex_list:
+            if re.search(pattern, log_content):
+                return STATUS_SUCCESS, f"Matched fast success regex: '{pattern}'", log_content, "N/A (Fast Path)", "N/A (Fast Path)"
+    
+    failure_regex_list = config.get("fast_failure_regex", [])
+    if failure_regex_list:
+        for pattern in failure_regex_list:
+            if re.search(pattern, log_content):
+                return STATUS_FAILURE, f"Matched fast failure regex: '{pattern}'", log_content, "N/A (Fast Path)", "N/A (Fast Path)"
+
+    # --- LLM Analysis Path ---
     prompt = prompt_template.format(
         log_content=log_content,
         success_patterns=success_patterns,
@@ -337,7 +354,7 @@ def handle_run(args):
                     update_report_row(report_path, row_index, result_data, headers, file_lock, wb)
                     completed_count += 1
                     if completed_count % SAVE_INTERVAL == 0:
-                        if wb: # Only save if it's an Excel file
+                        if wb:
                             with file_lock:
                                 wb.save(report_path)
                 except Exception as exc:

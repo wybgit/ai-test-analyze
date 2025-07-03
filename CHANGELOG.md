@@ -5,25 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-07-02
+
+### Added
+- **Fast Path Analysis**: Introduced `fast_success_regex` and `fast_failure_regex` in `config.json`. If a log matches these patterns, it is immediately classified without sending it to the LLM, significantly speeding up the process and reducing costs.
+
+### Changed
+- The core `analyze_log` function now performs the regex pre-check before falling back to LLM analysis.
+
 ## [0.5.0] - 2025-07-02
 
 ### Added
-- **Enhanced Analysis Context**: The report now includes a new `Extracted Log Content` column, showing the exact log snippet that was analyzed.
-- **Periodic Saving**: For Excel reports, the file is now saved periodically during long runs (every 100 items), providing better protection against data loss from interruptions.
-- **Advanced Issue Classification**: The prompt now guides the LLM to classify failures as either **Environmental Issues** or **Software Defects**, leading to more actionable insights.
-
-### Changed
-- The `analyze_log` function now returns the extracted log content along with other analysis data.
-- The main processing loop in `handle_run` has been updated to implement periodic saving for Excel files.
+- An `Extracted Log Content` column in the report.
+- Periodic saving for Excel reports to prevent data loss.
+- Advanced issue classification prompt to distinguish between environmental issues and software defects.
 
 ## [0.4.0] - 2025-07-02
 
 ### Added
 - Intelligent Log Reading (last 8KB).
 - Exception Pattern Matching with `exception_pattern.template`.
-
-### Changed
-- Updated main prompt to use exception patterns.
 
 ## [0.3.0] - 2025-07-02
 

@@ -5,6 +5,17 @@
     "max_tokens": 8192,
     "temperature": 0.6,
     "top_p": 0.7,
+    "fast_success_regex": [
+        "All tests passed successfully",
+        "^\\s*OK\\s*$",
+        "BUILD SUCCESSFUL"
+    ],
+    "fast_failure_regex": [
+        "(?i)ERROR",
+        "(?i)FATAL",
+        "Traceback \\(most recent call last\\):",
+        "BUILD FAILED"
+    ],
     "directory_whitelist": [
         "*"
     ],
@@ -15,11 +26,9 @@
     "directory_blacklist": [
         ".git",
         "__pycache__",
-        "node_modules",
-        "golden_outputs"
+        "node_modules"
     ],
     "logfile_blacklist": [
-        "*.tmp",
-        "temp_*.log"
+        "*.tmp"
     ]
 }
